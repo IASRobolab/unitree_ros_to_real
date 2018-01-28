@@ -175,8 +175,7 @@ int main(int argc, char **argv)
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
     pub_odom = root_nh.advertise<nav_msgs::Odometry>("odom", 20);
 
-
-    sub_cmd_vel = nh.subscribe("cmd_vel", 1, cmdVelCallback);
+    sub_cmd_vel = root_nh.subscribe("/cmd_vel", 20, cmdVelCallback);
 
     LoopFunc loop_udpSend("high_udp_send", 0.002, 3, boost::bind(&Custom::highUdpSend, &custom));
     LoopFunc loop_udpRecv("high_udp_recv", 0.002, 3, boost::bind(&Custom::highUdpRecv, &custom));
