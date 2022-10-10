@@ -17,27 +17,15 @@ if("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "x86_64.*")
 else()
   set(ARCH arm64)
 endif()
-set(LEGGED_SDK_NAME -pthread libunitree_legged_sdk_${ARCH}.so lcm)
-
-set(EXTRA_LIBS ${LEGGED_SDK_NAME} lcm)
+set(EXTRA_LIBS -pthread libunitree_legged_sdk_${ARCH}.so lcm)
 
 
 set(CMAKE_CXX_FLAGS "-O3 -fPIC")
 
-
-
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/unitree_legged_sdk-master/include
 )
-
-
-
-link_directories(${CMAKE_SOURCE_DIR}/unitree_legged_sdk-master/lib)
-
-
-
 
 add_executable(example_walk src/exe/example_walk.cpp)
 target_link_libraries(example_walk ${EXTRA_LIBS} ${catkin_LIBRARIES})
@@ -63,3 +51,8 @@ add_executable(twist_sub src/exe/twist_sub.cpp)
 target_link_libraries(twist_sub ${EXTRA_LIBS} ${catkin_LIBRARIES})
 add_dependencies(twist_sub ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+# Install
+install(TARGETS example_walk example_position state_sub ros_udp control_via_keyboard twist_sub
+        ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+        RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
