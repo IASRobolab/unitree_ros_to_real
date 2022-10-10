@@ -24,7 +24,7 @@ public:
 
 public:
     Custom()
-        : low_udp(LOWLEVEL),
+        : low_udp(8090, "192.168.123.10", 8007, sizeof(LowCmd), sizeof(LowState)),
           high_udp(8090, "192.168.123.161", 8082, sizeof(HighCmd), sizeof(HighState))
     {
         high_udp.InitCmdData(high_cmd);
