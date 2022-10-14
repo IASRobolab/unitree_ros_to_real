@@ -6,6 +6,7 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS
     roscpp
     geometry_msgs
+    sensor_msgs
     unitree_legged_msgs
 )
 
@@ -51,8 +52,12 @@ add_executable(twist_sub src/exe/twist_sub.cpp)
 target_link_libraries(twist_sub ${EXTRA_LIBS} ${catkin_LIBRARIES})
 add_dependencies(twist_sub ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+add_executable(nav_control src/exe/nav_control.cpp)
+target_link_libraries(nav_control ${EXTRA_LIBS} ${catkin_LIBRARIES})
+add_dependencies(nav_control ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
 # Install
-install(TARGETS example_walk example_position state_sub ros_udp control_via_keyboard twist_sub
+install(TARGETS example_walk example_position state_sub ros_udp control_via_keyboard twist_sub nav_control
         ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
         RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
