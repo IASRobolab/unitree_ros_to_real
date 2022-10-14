@@ -75,6 +75,22 @@ ros::Publisher pub_imu;
 sensor_msgs::Imu imu_msg;
 sensor_msgs::JointState joint_state_msg;
 
+/** @brief Map Aliengo internal joint indices to WoLF joints order */
+std::array<unsigned int, 12> go1_motor_idxs
+        {{
+        UNITREE_LEGGED_SDK::FL_0, UNITREE_LEGGED_SDK::FL_1, UNITREE_LEGGED_SDK::FL_2, // LF
+        UNITREE_LEGGED_SDK::RL_0, UNITREE_LEGGED_SDK::RL_1, UNITREE_LEGGED_SDK::RL_2, // LH
+        UNITREE_LEGGED_SDK::FR_0, UNITREE_LEGGED_SDK::FR_1, UNITREE_LEGGED_SDK::FR_2, // RF
+        UNITREE_LEGGED_SDK::RR_0, UNITREE_LEGGED_SDK::RR_1, UNITREE_LEGGED_SDK::RR_2, // RH
+        }};
+std::array<std::string, 12> go1_motor_names
+        {{
+        "lf_haa_joint", "lf_hfe_joint", "lf_kfe_joint", // LF
+        "lh_haa_joint", "lh_hfe_joint", "lh_kfe_joint", // LH
+        "rf_haa_joint", "rf_hfe_joint", "rf_kfe_joint", // RF
+        "rh_haa_joint", "rh_hfe_joint", "rh_kfe_joint", // RH
+        }};
+
 long cmd_vel_count = 0;
 
 void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
@@ -91,23 +107,27 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 
 void pubState()
 {
-    for (int motor_id = 0; motor_id < N_MOTORS; ++motor_id)
+    for (unsigned int motor_id = 0; motor_id < N_MOTORS; ++motor_id)
     {
-        joint_state_msg.position[motor_id] = custom.high_state.motorState[motor_id].q;
-        joint_state_msg.velocity[motor_id] = custom.high_state.motorState[motor_id].dq; // NOTE: this order is different than google
-        joint_state_msg.effort[motor_id]   = custom.high_state.motorState[motor_id].tauEst;
+        joint_state_msg.name[motor_id]     = go1_motor_names[motor_id];
+        joint_state_msg.position[motor_id] = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].q);
+        joint_state_msg.velocity[motor_id] = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].dq); // NOTE: this order is different than google
+        joint_state_msg.effort[motor_id]   = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].tauEst);
     }
 
-    imu_msg.orientation.w = custom.high_state.imu.quaternion[0];
-    imu_msg.orientation.x = custom.high_state.imu.quaternion[1];
-    imu_msg.orientation.y = custom.high_state.imu.quaternion[2];
-    imu_msg.orientation.z = custom.high_state.imu.quaternion[3];
-    imu_msg.angular_velocity.x = custom.high_state.imu.gyroscope[0];
-    imu_msg.angular_velocity.y = custom.high_state.imu.gyroscope[1];
-    imu_msg.angular_velocity.z = custom.high_state.imu.gyroscope[2];
-    imu_msg.linear_acceleration.x = custom.high_state.imu.accelerometer[0];
-    imu_msg.linear_acceleration.y = custom.high_state.imu.accelerometer[1];
-    imu_msg.linear_acceleration.z = custom.high_state.imu.accelerometer[2];
+    imu_msg.header.seq            ++;
+    imu_msg.header.stamp          = ros::Time::now();
+    imu_msg.header.frame_id       = "trunk_imu";
+    imu_msg.orientation.w         = static_cast<double>(custom.high_state.imu.quaternion[0]);
+    imu_msg.orientation.x         = static_cast<double>(custom.high_state.imu.quaternion[1]);
+    imu_msg.orientation.y         = static_cast<double>(custom.high_state.imu.quaternion[2]);
+    imu_msg.orientation.z         = static_cast<double>(custom.high_state.imu.quaternion[3]);
+    imu_msg.angular_velocity.x    = static_cast<double>(custom.high_state.imu.gyroscope[0]);
+    imu_msg.angular_velocity.y    = static_cast<double>(custom.high_state.imu.gyroscope[1]);
+    imu_msg.angular_velocity.z    = static_cast<double>(custom.high_state.imu.gyroscope[2]);
+    imu_msg.linear_acceleration.x = static_cast<double>(custom.high_state.imu.accelerometer[0]);
+    imu_msg.linear_acceleration.y = static_cast<double>(custom.high_state.imu.accelerometer[1]);
+    imu_msg.linear_acceleration.z = static_cast<double>(custom.high_state.imu.accelerometer[2]);
 
     pub_joint_state.publish(joint_state_msg);
     pub_imu.publish(imu_msg);
@@ -120,6 +140,7 @@ int main(int argc, char **argv)
 
     ros::NodeHandle nh("go1");
 
+    joint_state_msg.name.resize(N_MOTORS);
     joint_state_msg.position.resize(N_MOTORS);
     joint_state_msg.velocity.resize(N_MOTORS);
     joint_state_msg.effort.resize(N_MOTORS);
