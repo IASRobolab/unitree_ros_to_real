@@ -72,7 +72,7 @@ Custom custom;
 ros::Subscriber sub_cmd_vel;
 ros::Publisher pub_joint_state;
 ros::Publisher pub_imu;
-ros::Publisher odom_pub;
+ros::Publisher pub_odom;
 
 sensor_msgs::Imu imu_msg;
 sensor_msgs::JointState joint_state_msg;
@@ -153,7 +153,7 @@ void pubState()
     odom_msg.twist.twist.angular        = imu_msg.angular_velocity;
     // Missing Covariance
 
-    odom_pub.publish(odom_msg);
+    pub_odom.publish(odom_msg);
     pub_joint_state.publish(joint_state_msg);
     pub_imu.publish(imu_msg);
 }
@@ -172,6 +172,8 @@ int main(int argc, char **argv)
 
     pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 1);
+    pub_odom = nh.advertise<nav_msgs::Odometry>("odom", 1);
+
 
     sub_cmd_vel = nh.subscribe("cmd_vel", 1, cmdVelCallback);
 
