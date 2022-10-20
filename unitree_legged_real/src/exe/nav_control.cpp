@@ -10,6 +10,7 @@
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Imu.h>
+#include <nav_msgs/Odometry.h>
 
 #define N_MOTORS 12
 
@@ -71,9 +72,11 @@ Custom custom;
 ros::Subscriber sub_cmd_vel;
 ros::Publisher pub_joint_state;
 ros::Publisher pub_imu;
+ros::Publisher odom_pub;
 
 sensor_msgs::Imu imu_msg;
 sensor_msgs::JointState joint_state_msg;
+nav_msgs::Odometry odom_msg;
 
 /** @brief Map Aliengo internal joint indices to WoLF joints order */
 std::array<unsigned int, 12> go1_motor_idxs
@@ -136,6 +139,21 @@ void pubState()
     imu_msg.linear_acceleration.y = static_cast<double>(custom.high_state.imu.accelerometer[1]);
     imu_msg.linear_acceleration.z = static_cast<double>(custom.high_state.imu.accelerometer[2]);
 
+    odom_msg.header.seq                 ++;
+    odom_msg.header.stamp               = t;
+    odom_msg.header.frame_id            = "base";
+    odom_msg.child_frame_id             = "odom";
+    odom_msg.pose.pose.position.x       = static_cast<double>(custom.high_state.position[0]);
+    odom_msg.pose.pose.position.y       = static_cast<double>(custom.high_state.position[1]);
+    odom_msg.pose.pose.position.z       = static_cast<double>(custom.high_state.position[2]);
+    odom_msg.pose.pose.orientation      = imu_msg.orientation;
+    odom_msg.twist.twist.linear.x       = static_cast<double>(custom.high_state.velocity[0]);
+    odom_msg.twist.twist.linear.y       = static_cast<double>(custom.high_state.velocity[1]);
+    odom_msg.twist.twist.linear.z       = static_cast<double>(custom.high_state.velocity[2]);
+    odom_msg.twist.twist.angular        = imu_msg.angular_velocity;
+    // Missing Covariance
+
+    odom_pub.publish(odom_msg);
     pub_joint_state.publish(joint_state_msg);
     pub_imu.publish(imu_msg);
 }
