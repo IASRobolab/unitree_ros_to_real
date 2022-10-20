@@ -107,6 +107,13 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 
 void pubState()
 {
+
+    ros::Time t = ros::Time::now();
+
+    joint_state_msg.header.seq            ++;
+    joint_state_msg.header.stamp          = t;
+    joint_state_msg.header.frame_id       = "trunk";
+
     for (unsigned int motor_id = 0; motor_id < N_MOTORS; ++motor_id)
     {
         joint_state_msg.name[motor_id]     = go1_motor_names[motor_id];
@@ -116,7 +123,7 @@ void pubState()
     }
 
     imu_msg.header.seq            ++;
-    imu_msg.header.stamp          = ros::Time::now();
+    imu_msg.header.stamp          = t;
     imu_msg.header.frame_id       = "trunk_imu";
     imu_msg.orientation.w         = static_cast<double>(custom.high_state.imu.quaternion[0]);
     imu_msg.orientation.x         = static_cast<double>(custom.high_state.imu.quaternion[1]);
