@@ -141,8 +141,8 @@ void pubState()
 
     odom_msg.header.seq                 ++;
     odom_msg.header.stamp               = t;
-    odom_msg.header.frame_id            = "base";
-    odom_msg.child_frame_id             = "odom";
+    odom_msg.header.frame_id            = "odom";
+    odom_msg.child_frame_id             = "trunk";
     odom_msg.pose.pose.position.x       = static_cast<double>(custom.high_state.position[0]);
     odom_msg.pose.pose.position.y       = static_cast<double>(custom.high_state.position[1]);
     odom_msg.pose.pose.position.z       = static_cast<double>(custom.high_state.position[2]);
@@ -170,9 +170,9 @@ int main(int argc, char **argv)
     joint_state_msg.velocity.resize(N_MOTORS);
     joint_state_msg.effort.resize(N_MOTORS);
 
-    pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 1);
-    pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 1);
-    pub_odom = nh.advertise<nav_msgs::Odometry>("odom", 1);
+    pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 20);
+    pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
+    pub_odom = nh.advertise<nav_msgs::Odometry>("odom", 20);
 
 
     sub_cmd_vel = nh.subscribe("cmd_vel", 1, cmdVelCallback);
