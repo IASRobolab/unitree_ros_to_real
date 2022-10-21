@@ -141,7 +141,7 @@ void pubState()
 
     odom_msg.header.seq                 ++;
     odom_msg.header.stamp               = t;
-    odom_msg.header.frame_id            = "odom";
+    odom_msg.header.frame_id            = "base";
     odom_msg.child_frame_id             = "trunk";
     odom_msg.pose.pose.position.x       = static_cast<double>(custom.high_state.position[0]);
     odom_msg.pose.pose.position.y       = static_cast<double>(custom.high_state.position[1]);
@@ -164,6 +164,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "nav_control");
 
     ros::NodeHandle nh("go1");
+    ros::NodeHandle root_nh;
 
     joint_state_msg.name.resize(N_MOTORS);
     joint_state_msg.position.resize(N_MOTORS);
@@ -172,7 +173,7 @@ int main(int argc, char **argv)
 
     pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 20);
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
-    pub_odom = nh.advertise<nav_msgs::Odometry>("odom", 20);
+    pub_odom = root_nh.advertise<nav_msgs::Odometry>("odom", 20);
 
 
     sub_cmd_vel = nh.subscribe("cmd_vel", 1, cmdVelCallback);
