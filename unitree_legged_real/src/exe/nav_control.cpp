@@ -10,9 +10,19 @@
 #include <geometry_msgs/Twist.h>
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Imu.h>
+#include <sensor_msgs/BatteryState.h>
 #include <nav_msgs/Odometry.h>
 
 #define N_MOTORS 12
+
+template< class T >
+double avg(T* vect, unsigned int size)
+{
+    T res = 0.0;
+    for(unsigned int i=0;i<size;i++)
+        res = res + vect[i];
+    return res/size;
+}
 
 using namespace UNITREE_LEGGED_SDK;
 class Custom
@@ -67,26 +77,28 @@ public:
     }
 };
 
-Custom custom;
+static Custom custom;
 
-ros::Subscriber sub_cmd_vel;
-ros::Publisher pub_joint_state;
-ros::Publisher pub_imu;
-ros::Publisher pub_odom;
+static ros::Subscriber sub_cmd_vel;
+static ros::Publisher pub_joint_state;
+static ros::Publisher pub_imu;
+static ros::Publisher pub_odom;
+static ros::Publisher pub_battery;
 
-sensor_msgs::Imu imu_msg;
-sensor_msgs::JointState joint_state_msg;
-nav_msgs::Odometry odom_msg;
+static sensor_msgs::Imu imu_msg;
+static sensor_msgs::JointState joint_state_msg;
+static nav_msgs::Odometry odom_msg;
+static sensor_msgs::BatteryState battery_msg;
 
 /** @brief Map Aliengo internal joint indices to WoLF joints order */
-std::array<unsigned int, 12> go1_motor_idxs
+static std::array<unsigned int, 12> go1_motor_idxs
         {{
         UNITREE_LEGGED_SDK::FL_0, UNITREE_LEGGED_SDK::FL_1, UNITREE_LEGGED_SDK::FL_2, // LF
         UNITREE_LEGGED_SDK::RL_0, UNITREE_LEGGED_SDK::RL_1, UNITREE_LEGGED_SDK::RL_2, // LH
         UNITREE_LEGGED_SDK::FR_0, UNITREE_LEGGED_SDK::FR_1, UNITREE_LEGGED_SDK::FR_2, // RF
         UNITREE_LEGGED_SDK::RR_0, UNITREE_LEGGED_SDK::RR_1, UNITREE_LEGGED_SDK::RR_2, // RH
         }};
-std::array<std::string, 12> go1_motor_names
+static std::array<std::string, 12> go1_motor_names
         {{
         "lf_haa_joint", "lf_hfe_joint", "lf_kfe_joint", // LF
         "lh_haa_joint", "lh_hfe_joint", "lh_kfe_joint", // LH
@@ -94,7 +106,7 @@ std::array<std::string, 12> go1_motor_names
         "rh_haa_joint", "rh_hfe_joint", "rh_kfe_joint", // RH
         }};
 
-long cmd_vel_count = 0;
+static long cmd_vel_count = 0;
 
 void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 {
@@ -151,8 +163,16 @@ void pubState()
     odom_msg.twist.twist.linear.y       = static_cast<double>(custom.high_state.velocity[1]);
     odom_msg.twist.twist.linear.z       = static_cast<double>(custom.high_state.velocity[2]);
     odom_msg.twist.twist.angular        = imu_msg.angular_velocity;
-    // Missing Covariance
+    // TODO: Missing Covariance
 
+    battery_msg.header.seq              ++;
+    battery_msg.header.stamp            = t;
+    battery_msg.header.frame_id         = "trunk";
+    battery_msg.current                 = static_cast<float>(1000.0 * custom.high_state.bms.current); // mA -> A
+    battery_msg.voltage                 = static_cast<float>(1000.0 * avg<uint16_t>(&custom.high_state.bms.cell_vol[0],10)); // mA -> A
+    battery_msg.percentage              = custom.high_state.bms.SOC;
+
+    pub_battery.publish(battery_msg);
     pub_odom.publish(odom_msg);
     pub_joint_state.publish(joint_state_msg);
     pub_imu.publish(imu_msg);
@@ -173,7 +193,8 @@ int main(int argc, char **argv)
 
     pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 20);
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
-    pub_odom = root_nh.advertise<nav_msgs::Odometry>("odom", 20);
+    pub_odom = root_nh.advertise<nav_msgs::Odometry>("odom", 20); // Note the root_nh
+    pub_battery = nh.advertise<sensor_msgs::BatteryState>("battery_state", 20);
 
     sub_cmd_vel = root_nh.subscribe("/cmd_vel", 20, cmdVelCallback);
 
