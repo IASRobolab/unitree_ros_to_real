@@ -11,6 +11,7 @@
 #include <sensor_msgs/JointState.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/BatteryState.h>
+#include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
 
 #define N_MOTORS 12
@@ -80,15 +81,18 @@ public:
 static Custom custom;
 
 static ros::Subscriber sub_cmd_vel;
+static ros::Subscriber sub_gps;
 static ros::Publisher pub_joint_state;
 static ros::Publisher pub_imu;
 static ros::Publisher pub_odom;
 static ros::Publisher pub_battery;
+static ros::Publisher pub_gps;
 
 static sensor_msgs::Imu imu_msg;
 static sensor_msgs::JointState joint_state_msg;
 static nav_msgs::Odometry odom_msg;
 static sensor_msgs::BatteryState battery_msg;
+static sensor_msgs::NavSatFix gps_msg;
 
 /** @brief Map Aliengo internal joint indices to WoLF joints order */
 static std::array<unsigned int, 12> go1_motor_idxs
@@ -118,6 +122,14 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
     printf("cmd_y_vel = %f\n", custom.high_cmd.velocity[1]);
     printf("cmd_yaw_vel = %f\n", custom.high_cmd.yawSpeed);
 
+}
+
+void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
+{
+    //printf("lat = %f\n", msg->latitude);
+    //printf("long = %f\n", msg->longitude);
+    //printf("alt = %f\n", msg->altitude);
+    pub_gps.publish(msg);	
 }
 
 void pubState()
@@ -195,8 +207,10 @@ int main(int argc, char **argv)
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
     pub_odom = root_nh.advertise<nav_msgs::Odometry>("odom", 20); // Note the root_nh
     pub_battery = nh.advertise<sensor_msgs::BatteryState>("battery_state", 20);
+    pub_gps = nh.advertise<sensor_msgs::NavSatFix>("gps/fix", 20);
 
-    sub_cmd_vel = root_nh.subscribe("/cmd_vel", 20, cmdVelCallback);
+    sub_cmd_vel = root_nh.subscribe("/cmd_vel", 20,  cmdVelCallback);
+    sub_gps     = root_nh.subscribe("/location", 20, gpsCallback);
 
     LoopFunc loop_udpSend("high_udp_send", 0.002, 3, boost::bind(&Custom::highUdpSend, &custom));
     LoopFunc loop_udpRecv("high_udp_recv", 0.002, 3, boost::bind(&Custom::highUdpRecv, &custom));
