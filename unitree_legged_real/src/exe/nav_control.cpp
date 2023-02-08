@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 
     pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 20);
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
-    pub_odom = root_nh.advertise<nav_msgs::Odometry>("odom", 20); // Note the root_nh
+    pub_odom = root_nh.advertise<nav_msgs::Odometry>("odometry/robot", 20); // Note the root_nh
     pub_battery = nh.advertise<sensor_msgs::BatteryState>("battery_state", 20);
     pub_gps = nh.advertise<sensor_msgs::NavSatFix>("gps/fix", 20);
 
