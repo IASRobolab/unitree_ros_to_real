@@ -13,6 +13,7 @@
 #include <sensor_msgs/BatteryState.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 #define N_MOTORS 12
 
@@ -87,12 +88,14 @@ static ros::Publisher pub_imu;
 static ros::Publisher pub_odom;
 static ros::Publisher pub_battery;
 static ros::Publisher pub_gps;
+static tf2_ros::TransformBroadcaster pub_tf;
 
 static sensor_msgs::Imu imu_msg;
 static sensor_msgs::JointState joint_state_msg;
 static nav_msgs::Odometry odom_msg;
 static sensor_msgs::BatteryState battery_msg;
 static sensor_msgs::NavSatFix gps_msg;
+static geometry_msgs::TransformStamped tf_msg;
 
 /** @brief Map Aliengo internal joint indices to WoLF joints order */
 static std::array<unsigned int, 12> go1_motor_idxs
@@ -165,7 +168,7 @@ void pubState()
 
     odom_msg.header.seq                 ++;
     odom_msg.header.stamp               = t;
-    odom_msg.header.frame_id            = "base";
+    odom_msg.header.frame_id            = "odom";
     odom_msg.child_frame_id             = "trunk";
     odom_msg.pose.pose.position.x       = static_cast<double>(custom.high_state.position[0]);
     odom_msg.pose.pose.position.y       = static_cast<double>(custom.high_state.position[1]);
@@ -176,6 +179,19 @@ void pubState()
     odom_msg.twist.twist.linear.z       = static_cast<double>(custom.high_state.velocity[2]);
     odom_msg.twist.twist.angular        = imu_msg.angular_velocity;
     // TODO: Missing Covariance
+
+    tf_msg.header.seq      ++;
+    tf_msg.header.stamp    = t;
+    tf_msg.header.frame_id = odom_msg.header.frame_id;
+    tf_msg.child_frame_id  = odom_msg.child_frame_id ;
+    tf_msg.transform.translation.x = odom_msg.pose.pose.position.x;
+    tf_msg.transform.translation.y = odom_msg.pose.pose.position.y;
+    tf_msg.transform.translation.z = odom_msg.pose.pose.position.z;
+    tf_msg.transform.rotation.x = odom_msg.pose.pose.orientation.x;
+    tf_msg.transform.rotation.y = odom_msg.pose.pose.orientation.y;
+    tf_msg.transform.rotation.z = odom_msg.pose.pose.orientation.z;
+    tf_msg.transform.rotation.w = odom_msg.pose.pose.orientation.w;
+    pub_tf.sendTransform(tf_msg);
 
     battery_msg.header.seq              ++;
     battery_msg.header.stamp            = t;
