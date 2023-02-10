@@ -94,7 +94,7 @@ static ros::Publisher pub_imu;
 static ros::Publisher pub_odom;
 static ros::Publisher pub_battery;
 static ros::Publisher pub_gps;
-static tf2_ros::TransformBroadcaster pub_tf;
+std::shared_ptr<tf2_ros::TransformBroadcaster> pub_tf;
 
 static sensor_msgs::Imu imu_msg;
 static sensor_msgs::JointState joint_state_msg;
@@ -253,6 +253,7 @@ void pubState()
     pub_odom.publish(odom_msg);
     pub_joint_state.publish(joint_state_msg);
     pub_imu.publish(imu_msg);
+    pub_tf->sendTransform(tf_msg);
 }
 
 int main(int argc, char **argv)
@@ -272,6 +273,7 @@ int main(int argc, char **argv)
     pub_odom = root_nh.advertise<nav_msgs::Odometry>("odometry/robot", 20); // Note the root_nh
     pub_battery = nh.advertise<sensor_msgs::BatteryState>("battery_state", 20);
     pub_gps = nh.advertise<sensor_msgs::NavSatFix>("gps/fix", 20);
+    pub_tf.reset(new tf2_ros::TransformBroadcaster);
 
     sub_cmd_vel = root_nh.subscribe("/cmd_vel", 20,  cmdVelCallback);
     sub_gps     = root_nh.subscribe("/location", 20, gpsCallback);
