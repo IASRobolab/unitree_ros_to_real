@@ -3,12 +3,15 @@ project(unitree_legged_real)
 
 add_compile_options(-std=c++11)
 
+find_package(PkgConfig)
+pkg_check_modules(EIGEN eigen3)
 find_package(catkin REQUIRED COMPONENTS
     roscpp
     geometry_msgs
     sensor_msgs
     tf2_ros
     unitree_legged_msgs
+    wolf_controller_utils
 )
 
 catkin_package()
@@ -27,6 +30,7 @@ set(CMAKE_CXX_FLAGS "-O3 -fPIC")
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIRS}
 )
 
 add_executable(example_walk src/exe/example_walk.cpp)

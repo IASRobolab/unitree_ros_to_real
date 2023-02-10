@@ -14,8 +14,14 @@
 #include <sensor_msgs/NavSatFix.h>
 #include <nav_msgs/Odometry.h>
 #include <tf2_ros/transform_broadcaster.h>
+#include <wolf_controller_utils/basefoot_estimator.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 #define N_MOTORS 12
+#define TRUNK "trunk"
+#define IMU "trunk_imu"
+#define BASEFOOT "basefoot_print"
+#define ODOM "odom"
 
 template< class T >
 double avg(T* vect, unsigned int size)
@@ -95,7 +101,15 @@ static sensor_msgs::JointState joint_state_msg;
 static nav_msgs::Odometry odom_msg;
 static sensor_msgs::BatteryState battery_msg;
 static sensor_msgs::NavSatFix gps_msg;
-static geometry_msgs::TransformStamped tf_msg;
+static geometry_msgs::TransformStamped odom_T_basefoot;
+static geometry_msgs::TransformStamped odom_T_trunk;
+static geometry_msgs::TransformStamped basefoot_T_trunk;
+
+static std::vector<bool> contact_states(4,true);
+static std::vector<double> contact_heights(4,0.0);
+
+using namespace wolf_controller_utils;
+static BasefootEstimator basefoot_estimator;
 
 /** @brief Map Aliengo internal joint indices to WoLF joints order */
 static std::array<unsigned int, 12> go1_motor_idxs
@@ -140,9 +154,11 @@ void pubState()
 
     ros::Time t = ros::Time::now();
 
+//****************** Joint state ******************
+
     joint_state_msg.header.seq            ++;
     joint_state_msg.header.stamp          = t;
-    joint_state_msg.header.frame_id       = "trunk";
+    joint_state_msg.header.frame_id       = TRUNK;
 
     for (unsigned int motor_id = 0; motor_id < N_MOTORS; ++motor_id)
     {
@@ -152,9 +168,11 @@ void pubState()
         joint_state_msg.effort[motor_id]   = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].tauEst);
     }
 
+//****************** IMU ******************
+
     imu_msg.header.seq            ++;
     imu_msg.header.stamp          = t;
-    imu_msg.header.frame_id       = "trunk_imu";
+    imu_msg.header.frame_id       = IMU;
     imu_msg.orientation.w         = static_cast<double>(custom.high_state.imu.quaternion[0]);
     imu_msg.orientation.x         = static_cast<double>(custom.high_state.imu.quaternion[1]);
     imu_msg.orientation.y         = static_cast<double>(custom.high_state.imu.quaternion[2]);
@@ -166,13 +184,20 @@ void pubState()
     imu_msg.linear_acceleration.y = static_cast<double>(custom.high_state.imu.accelerometer[1]);
     imu_msg.linear_acceleration.z = static_cast<double>(custom.high_state.imu.accelerometer[2]);
 
+//****************** ODOM MSG ******************
+
+    odom_T_trunk.transform.translation.x       = static_cast<double>(custom.high_state.position[0]);
+    odom_T_trunk.transform.translation.y       = static_cast<double>(custom.high_state.position[1]);
+    odom_T_trunk.transform.translation.z       = static_cast<double>(custom.high_state.position[2]);
+    odom_T_trunk.transform.rotation            = imu_msg.orientation;
+
     odom_msg.header.seq                 ++;
     odom_msg.header.stamp               = t;
-    odom_msg.header.frame_id            = "odom";
-    odom_msg.child_frame_id             = "trunk";
-    odom_msg.pose.pose.position.x       = static_cast<double>(custom.high_state.position[0]);
-    odom_msg.pose.pose.position.y       = static_cast<double>(custom.high_state.position[1]);
-    odom_msg.pose.pose.position.z       = static_cast<double>(custom.high_state.position[2]);
+    odom_msg.header.frame_id            = ODOM;
+    odom_msg.child_frame_id             = BASEFOOT;
+    odom_msg.pose.pose.position.x       = odom_T_trunk.transform.translation.x;
+    odom_msg.pose.pose.position.y       = odom_T_trunk.transform.translation.y;
+    odom_msg.pose.pose.position.z       = 0.0;
     odom_msg.pose.pose.orientation      = imu_msg.orientation;
     odom_msg.twist.twist.linear.x       = static_cast<double>(custom.high_state.velocity[0]);
     odom_msg.twist.twist.linear.y       = static_cast<double>(custom.high_state.velocity[1]);
@@ -180,22 +205,46 @@ void pubState()
     odom_msg.twist.twist.angular        = imu_msg.angular_velocity;
     // TODO: Missing Covariance
 
-    tf_msg.header.seq      ++;
-    tf_msg.header.stamp    = t;
-    tf_msg.header.frame_id = odom_msg.header.frame_id;
-    tf_msg.child_frame_id  = odom_msg.child_frame_id ;
-    tf_msg.transform.translation.x = odom_msg.pose.pose.position.x;
-    tf_msg.transform.translation.y = odom_msg.pose.pose.position.y;
-    tf_msg.transform.translation.z = odom_msg.pose.pose.position.z;
-    tf_msg.transform.rotation.x = odom_msg.pose.pose.orientation.x;
-    tf_msg.transform.rotation.y = odom_msg.pose.pose.orientation.y;
-    tf_msg.transform.rotation.z = odom_msg.pose.pose.orientation.z;
-    tf_msg.transform.rotation.w = odom_msg.pose.pose.orientation.w;
-    pub_tf.sendTransform(tf_msg);
+//****************** ODOM -> BASEFOOT ******************
 
+    odom_T_basefoot.header.seq              ++;
+    odom_T_basefoot.header.stamp            = t;
+    odom_T_basefoot.header.frame_id         = ODOM;
+    odom_T_basefoot.child_frame_id          = BASEFOOT;
+    odom_T_basefoot.transform.translation.x = odom_msg.pose.pose.position.x;
+    odom_T_basefoot.transform.translation.y = odom_msg.pose.pose.position.y;
+    odom_T_basefoot.transform.translation.z = odom_msg.pose.pose.position.z;
+    odom_T_basefoot.transform.rotation.x    = odom_msg.pose.pose.orientation.x;
+    odom_T_basefoot.transform.rotation.y    = odom_msg.pose.pose.orientation.y;
+    odom_T_basefoot.transform.rotation.z    = odom_msg.pose.pose.orientation.z;
+    odom_T_basefoot.transform.rotation.w    = odom_msg.pose.pose.orientation.w;
+
+    pub_tf.sendTransform(odom_T_basefoot);
+
+//****************** BASEFOOT -> TRUNK ******************
+
+    // Define the contact state
+    for(unsigned int i = 0; i< 4; i++)
+    {
+      contact_states[i]  = (custom.high_state.footForce[i] > 0.0 ? true : false );
+      contact_heights[i] = static_cast<double>(custom.high_state.footPosition2Body[i].z);
+    }
+    basefoot_estimator.setContacts(contact_states,contact_heights);
+    basefoot_estimator.setBasePoseInOdom(tf2::transformToEigen(odom_T_trunk));
+    basefoot_estimator.update();
+
+    basefoot_T_trunk.header.seq       ++;
+    basefoot_T_trunk.header.stamp    = t;
+    basefoot_T_trunk.header.frame_id = TRUNK;
+    basefoot_T_trunk.child_frame_id  = BASEFOOT;
+    basefoot_T_trunk = tf2::eigenToTransform(basefoot_estimator.getBasefootPoseInBase().inverse());
+
+    pub_tf.sendTransform(basefoot_T_trunk);
+
+//****************** BATTERY STATE ******************
     battery_msg.header.seq              ++;
     battery_msg.header.stamp            = t;
-    battery_msg.header.frame_id         = "trunk";
+    battery_msg.header.frame_id         = TRUNK;
     battery_msg.current                 = static_cast<float>(1000.0 * custom.high_state.bms.current); // mA -> A
     battery_msg.voltage                 = static_cast<float>(1000.0 * avg<uint16_t>(&custom.high_state.bms.cell_vol[0],10)); // mA -> A
     battery_msg.percentage              = custom.high_state.bms.SOC;
@@ -205,7 +254,6 @@ void pubState()
     pub_joint_state.publish(joint_state_msg);
     pub_imu.publish(imu_msg);
 }
-
 
 int main(int argc, char **argv)
 {
