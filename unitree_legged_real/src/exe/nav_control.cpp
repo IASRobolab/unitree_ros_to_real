@@ -127,12 +127,13 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 
 }
 
-void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
+void gpsCallback(const sensor_msgs::NavSatFix::Ptr &msg)
 {
     //printf("lat = %f\n", msg->latitude);
     //printf("long = %f\n", msg->longitude);
     //printf("alt = %f\n", msg->altitude);
-    pub_gps.publish(msg);
+    msg->header.frame_id = "trunk";
+    pub_gps.publish(msg);	
 }
 
 void pubState()
@@ -154,7 +155,7 @@ void pubState()
 
     imu_msg.header.seq            ++;
     imu_msg.header.stamp          = t;
-    imu_msg.header.frame_id       = "trunk_imu";
+    imu_msg.header.frame_id       = "trunk";
     imu_msg.orientation.w         = static_cast<double>(custom.high_state.imu.quaternion[0]);
     imu_msg.orientation.x         = static_cast<double>(custom.high_state.imu.quaternion[1]);
     imu_msg.orientation.y         = static_cast<double>(custom.high_state.imu.quaternion[2]);
