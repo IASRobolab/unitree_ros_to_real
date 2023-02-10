@@ -141,12 +141,13 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 
 }
 
-void gpsCallback(const sensor_msgs::NavSatFix::ConstPtr &msg)
+void gpsCallback(const sensor_msgs::NavSatFix::Ptr &msg)
 {
     //printf("lat = %f\n", msg->latitude);
     //printf("long = %f\n", msg->longitude);
     //printf("alt = %f\n", msg->altitude);
-    pub_gps.publish(msg);
+    msg->header.frame_id = TRUNK;
+    pub_gps.publish(msg);	
 }
 
 void pubState()
