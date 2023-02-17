@@ -233,8 +233,10 @@ void pubState()
 	    // Define the contact state
 	    for(unsigned int i = 0; i< 4; i++)
 	    {
-	      contact_states[i]  = (custom.high_state.footForce[i] > 0.0 ? true : false );
-	      contact_heights[i] = static_cast<double>(custom.high_state.footPosition2Body[i].z);
+	      //printf("force[%i] = %f\n", i, custom.high_state.footForce[i]);
+              //printf("height[%i] = %f\n", i, custom.high_state.footPosition2Body[i].z);
+	      contact_states[i]  = (std::abs(custom.high_state.footForce[i]) > 0.0 ? true : false );
+	      contact_heights[i] = -static_cast<double>(custom.high_state.footPosition2Body[i].z);
 	    }
 	    basefoot_estimator.setContacts(contact_states,contact_heights);
 	    basefoot_estimator.setBasePoseInOdom(tf2::transformToEigen(odom_T_trunk));
@@ -243,8 +245,8 @@ void pubState()
 	    basefoot_T_trunk = tf2::eigenToTransform(basefoot_estimator.getBasefootPoseInBase().inverse());
 	    basefoot_T_trunk.header.seq       ++;
 	    basefoot_T_trunk.header.stamp    = ros::Time::now();
-	    basefoot_T_trunk.header.frame_id = TRUNK;
-	    basefoot_T_trunk.child_frame_id  = BASEFOOT;
+	    basefoot_T_trunk.header.frame_id = BASEFOOT;
+	    basefoot_T_trunk.child_frame_id  = TRUNK;
 
 	    pub_tf->sendTransform(basefoot_T_trunk);
 
