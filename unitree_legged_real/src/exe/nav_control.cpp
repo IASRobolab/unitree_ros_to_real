@@ -20,7 +20,7 @@
 #define N_MOTORS 12
 #define TRUNK "trunk"
 #define IMU "trunk_imu"
-#define BASEFOOT "basefoot_print"
+#define BASEFOOT "base_footprint"
 #define ODOM "odom"
 
 template< class T >
