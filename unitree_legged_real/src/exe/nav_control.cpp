@@ -16,6 +16,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <wolf_controller_utils/basefoot_estimator.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <rt_gui/rt_gui_client.h>
 
 #define N_MOTORS 12
 #define TRUNK "trunk"
@@ -107,6 +108,7 @@ static geometry_msgs::TransformStamped basefoot_T_trunk;
 
 static std::vector<bool> contact_states(4,true);
 static std::vector<double> contact_heights(4,0.0);
+static bool nav_control_active;
 
 ros::Time t;
 ros::Time t_prev;
@@ -136,7 +138,14 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 {
     printf("cmdVelCallback is running!\t%ld\n", cmd_vel_count);
 
-    custom.high_cmd = rosMsg2Cmd(msg);
+    if(nav_control_active)
+    	custom.high_cmd = rosMsg2Cmd(msg);
+    else
+    {
+        custom.high_cmd.velocity[0] = 0.0;
+        custom.high_cmd.velocity[1] = 0.0;
+        custom.high_cmd.yawSpeed = 0.0;
+    }
 
     printf("cmd_x_vel = %f\n", custom.high_cmd.velocity[0]);
     printf("cmd_y_vel = %f\n", custom.high_cmd.velocity[1]);
@@ -275,6 +284,10 @@ int main(int argc, char **argv)
     ros::NodeHandle nh("go1");
     ros::NodeHandle root_nh;
 
+    nav_control_active = true;
+    rt_gui::RtGuiClient::getIstance().init("wolf_panel","nav_control");
+    rt_gui::RtGuiClient::getIstance().addBool("nav_control",std::string("Active"),&nav_control_active);
+
     joint_state_msg.name.resize(N_MOTORS);
     joint_state_msg.position.resize(N_MOTORS);
     joint_state_msg.velocity.resize(N_MOTORS);
@@ -298,7 +311,14 @@ int main(int argc, char **argv)
     loop_udpRecv.start();
     loop_state.start();
 
-    ros::spin();
+    //ros::spin(); // Because cbs are handled by rt_gui
+    ros::Rate rate(100);
+    while(ros::ok())
+    {
+	rt_gui::RtGuiClient::getIstance().sync();
+	rate.sleep();
+	ros::spinOnce();
+    }
 
     return 0;
 }

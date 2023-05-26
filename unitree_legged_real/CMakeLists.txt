@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
     tf2_ros
     unitree_legged_msgs
     wolf_controller_utils
+    rt_gui
 )
 
 catkin_package()
