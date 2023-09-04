@@ -44,6 +44,8 @@ public:
 
     LowCmd low_cmd = {0};
     LowState low_state = {0};
+    
+    xRockerBtnDataStruct keyData;
 
 public:
     Custom()
@@ -134,13 +136,17 @@ static long cmd_vel_count = 0;
 
 void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 {
-    printf("cmdVelCallback is running!\t%ld\n", cmd_vel_count);
+ printf("cmdVelCallback is running!\t%ld\n", cmd_vel_count);
+    
+    if ( std::abs(custom.keyData.rx) < 0.1 && std::abs(custom.keyData.lx) < 0.1 && std::abs(custom.keyData.ry) < 0.1 && std::abs(custom.keyData.ly) < 0.1 )
+    {
 
     custom.high_cmd = rosMsg2Cmd(msg);
 
     printf("cmd_x_vel = %f\n", custom.high_cmd.velocity[0]);
     printf("cmd_y_vel = %f\n", custom.high_cmd.velocity[1]);
     printf("cmd_yaw_vel = %f\n", custom.high_cmd.yawSpeed);
+    }
 
 }
 
@@ -263,6 +269,14 @@ void pubState()
 	    pub_odom.publish(odom_msg);
 	    pub_joint_state.publish(joint_state_msg);
 	    pub_imu.publish(imu_msg);
+	    
+//****************** WIRELESS REMOTE CHECK ****************
+            memcpy(&custom.keyData, &custom.high_state.wirelessRemote[0], 40);   
+            //std::cout << "lx "<< custom.keyData.lx << std::endl;
+            //std::cout << "ly "<< custom.keyData.ly << std::endl;
+            //std::cout << "rx "<< custom.keyData.rx << std::endl;
+            //std::cout << "ry "<< custom.keyData.ry << std::endl;
+
     }
 
     t_prev = t;
