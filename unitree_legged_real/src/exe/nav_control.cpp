@@ -281,7 +281,8 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "nav_control");
 
-    ros::NodeHandle nh("go1");
+    //ros::NodeHandle nh("go1");
+    ros::NodeHandle nh;
     ros::NodeHandle root_nh;
 
     nav_control_active = true;
