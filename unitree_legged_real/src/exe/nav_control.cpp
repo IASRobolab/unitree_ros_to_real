@@ -272,7 +272,8 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "nav_control");
 
-    ros::NodeHandle nh("go1");
+    //ros::NodeHandle nh("go1");
+    ros::NodeHandle nh;
     ros::NodeHandle root_nh;
 
     joint_state_msg.name.resize(N_MOTORS);
