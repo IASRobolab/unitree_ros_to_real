@@ -15,6 +15,7 @@
 #include <nav_msgs/Odometry.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <wolf_controller_utils/basefoot_estimator.h>
+#include <wolf_controller_utils/tools.h>
 #include <tf2_eigen/tf2_eigen.h>
 
 #define N_MOTORS 12
@@ -110,6 +111,8 @@ static geometry_msgs::TransformStamped basefoot_T_trunk;
 static std::vector<bool> contact_states(4,true);
 static std::vector<double> contact_heights(4,0.0);
 
+static std::string tf_prefix = "";
+
 ros::Time t;
 ros::Time t_prev;
 
@@ -155,7 +158,7 @@ void gpsCallback(const sensor_msgs::NavSatFix::Ptr &msg)
     //printf("lat = %f\n", msg->latitude);
     //printf("long = %f\n", msg->longitude);
     //printf("alt = %f\n", msg->altitude);
-    msg->header.frame_id = TRUNK;
+    msg->header.frame_id = tf_prefix+TRUNK;
     pub_gps.publish(msg);	
 }
 
@@ -171,7 +174,7 @@ void pubState()
 
 	    joint_state_msg.header.seq            ++;
 	    joint_state_msg.header.stamp          = t;
-	    joint_state_msg.header.frame_id       = TRUNK;
+	    joint_state_msg.header.frame_id       = tf_prefix+TRUNK;
 
 	    for (unsigned int motor_id = 0; motor_id < N_MOTORS; ++motor_id)
 	    {
@@ -185,7 +188,7 @@ void pubState()
 
 	    imu_msg.header.seq            ++;
 	    imu_msg.header.stamp          = t;
-	    imu_msg.header.frame_id       = IMU;
+	    imu_msg.header.frame_id       = tf_prefix+IMU;
 	    imu_msg.orientation.w         = static_cast<double>(custom.high_state.imu.quaternion[0]);
 	    imu_msg.orientation.x         = static_cast<double>(custom.high_state.imu.quaternion[1]);
 	    imu_msg.orientation.y         = static_cast<double>(custom.high_state.imu.quaternion[2]);
@@ -206,8 +209,8 @@ void pubState()
 
 	    odom_msg.header.seq                 ++;
 	    odom_msg.header.stamp               = t;
-	    odom_msg.header.frame_id            = ODOM;
-	    odom_msg.child_frame_id             = BASEFOOT;
+	    odom_msg.header.frame_id            = tf_prefix+ODOM;
+	    odom_msg.child_frame_id             = tf_prefix+BASEFOOT;
 	    odom_msg.pose.pose.position.x       = odom_T_trunk.transform.translation.x;
 	    odom_msg.pose.pose.position.y       = odom_T_trunk.transform.translation.y;
 	    odom_msg.pose.pose.position.z       = 0.0;
@@ -222,8 +225,8 @@ void pubState()
 
 	    odom_T_basefoot.header.seq              ++;
 	    odom_T_basefoot.header.stamp            = ros::Time::now();
-	    odom_T_basefoot.header.frame_id         = ODOM;
-	    odom_T_basefoot.child_frame_id          = BASEFOOT;
+	    odom_T_basefoot.header.frame_id         = tf_prefix+ODOM;
+	    odom_T_basefoot.child_frame_id          = tf_prefix+BASEFOOT;
 	    odom_T_basefoot.transform.translation.x = odom_msg.pose.pose.position.x;
 	    odom_T_basefoot.transform.translation.y = odom_msg.pose.pose.position.y;
 	    odom_T_basefoot.transform.translation.z = odom_msg.pose.pose.position.z;
@@ -251,8 +254,8 @@ void pubState()
 	    basefoot_T_trunk = tf2::eigenToTransform(basefoot_estimator.getBasefootPoseInBase().inverse());
 	    basefoot_T_trunk.header.seq       ++;
 	    basefoot_T_trunk.header.stamp    = ros::Time::now();
-	    basefoot_T_trunk.header.frame_id = BASEFOOT;
-	    basefoot_T_trunk.child_frame_id  = TRUNK;
+	    basefoot_T_trunk.header.frame_id = tf_prefix+BASEFOOT;
+	    basefoot_T_trunk.child_frame_id  = tf_prefix+TRUNK;
 
 	    pub_tf->sendTransform(basefoot_T_trunk);
 
@@ -260,7 +263,7 @@ void pubState()
 
 	    battery_msg.header.seq              ++;
 	    battery_msg.header.stamp            = t;
-	    battery_msg.header.frame_id         = TRUNK;
+	    battery_msg.header.frame_id         = tf_prefix+TRUNK;
 	    battery_msg.current                 = static_cast<float>(1000.0 * custom.high_state.bms.current); // mA -> A
 	    battery_msg.voltage                 = static_cast<float>(1000.0 * avg<uint16_t>(&custom.high_state.bms.cell_vol[0],10)); // mA -> A
 	    battery_msg.percentage              = custom.high_state.bms.SOC;
@@ -288,7 +291,12 @@ int main(int argc, char **argv)
 
     //ros::NodeHandle nh("go1");
     ros::NodeHandle nh;
-    ros::NodeHandle root_nh;
+    ros::NodeHandle priv_nh("~");
+
+    priv_nh.getParam("tf_prefix", tf_prefix);
+    // Check and fix tf_prefix
+    wolf_controller_utils::fixTFprefix(tf_prefix);
+    std::cout << tf_prefix << std::endl;
 
     joint_state_msg.name.resize(N_MOTORS);
     joint_state_msg.position.resize(N_MOTORS);
@@ -297,13 +305,13 @@ int main(int argc, char **argv)
 
     pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 20);
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
-    pub_odom = root_nh.advertise<nav_msgs::Odometry>("odometry/robot", 20); // Note the root_nh
+    pub_odom = nh.advertise<nav_msgs::Odometry>("odometry/robot", 20);
     pub_battery = nh.advertise<sensor_msgs::BatteryState>("battery_state", 20);
     pub_gps = nh.advertise<sensor_msgs::NavSatFix>("gps/fix", 20);
     pub_tf.reset(new tf2_ros::TransformBroadcaster);
 
-    sub_cmd_vel = root_nh.subscribe("/cmd_vel", 20,  cmdVelCallback);
-    sub_gps     = root_nh.subscribe("/location", 20, gpsCallback);
+    sub_cmd_vel = nh.subscribe("cmd_vel", 20,  cmdVelCallback);
+    sub_gps     = nh.subscribe("/location", 20, gpsCallback); // Note the root
 
     LoopFunc loop_udpSend("high_udp_send", 0.002, 3, boost::bind(&Custom::highUdpSend, &custom));
     LoopFunc loop_udpRecv("high_udp_recv", 0.002, 3, boost::bind(&Custom::highUdpRecv, &custom));
