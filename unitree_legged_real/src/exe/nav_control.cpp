@@ -17,6 +17,7 @@
 #include <wolf_controller_utils/basefoot_estimator.h>
 #include <wolf_controller_utils/tools.h>
 #include <tf2_eigen/tf2_eigen.h>
+#include <std_srvs/Trigger.h>
 
 #define N_MOTORS 12
 #define TRUNK "trunk"
@@ -98,6 +99,8 @@ static ros::Publisher pub_odom;
 static ros::Publisher pub_battery;
 static ros::Publisher pub_gps;
 std::shared_ptr<tf2_ros::TransformBroadcaster> pub_tf;
+static ros::ServiceServer srv_standup;
+static ros::ServiceServer srv_standdown;
 
 static sensor_msgs::Imu imu_msg;
 static sensor_msgs::JointState joint_state_msg;
@@ -171,6 +174,26 @@ void gpsCallback(const sensor_msgs::NavSatFix::Ptr &msg)
 {
     msg->header.frame_id = tf_prefix+TRUNK;
     pub_gps.publish(msg);
+}
+
+bool standupCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
+{
+    custom.high_cmd.mode = 6;
+    custom.high_cmd.velocity[0] = 0;
+    custom.high_cmd.velocity[1] = 0;
+    custom.high_cmd.yawSpeed    = 0;
+    res.success = true;
+    return true;
+}
+
+bool standdownCallback(std_srvs::Trigger::Request& req, std_srvs::Trigger::Response& res)
+{
+    custom.high_cmd.mode = 5;
+    custom.high_cmd.velocity[0] = 0;
+    custom.high_cmd.velocity[1] = 0;
+    custom.high_cmd.yawSpeed    = 0;
+    res.success = true;
+    return true;
 }
 
 void pubState()
@@ -314,6 +337,9 @@ int main(int argc, char **argv)
     joint_state_msg.position.resize(N_MOTORS);
     joint_state_msg.velocity.resize(N_MOTORS);
     joint_state_msg.effort.resize(N_MOTORS);
+
+    srv_standup   = nh.advertiseService("wolf_controller/stand_up",   standupCallback);
+    srv_standdown = nh.advertiseService("wolf_controller/stand_down", standdownCallback);
 
     pub_joint_state = nh.advertise<sensor_msgs::JointState>("joint_states", 20);
     pub_imu = nh.advertise<sensor_msgs::Imu>("imu", 20);
