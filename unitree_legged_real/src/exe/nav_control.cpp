@@ -115,6 +115,8 @@ static std::string tf_prefix = "";
 
 ros::Time t;
 ros::Time t_prev;
+ros::Time t_timer;
+bool timer_on = false;
 
 using namespace wolf_controller_utils;
 static BasefootEstimator basefoot_estimator;
@@ -139,27 +141,36 @@ static long cmd_vel_count = 0;
 
 void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
 {
- printf("cmdVelCallback is running!\t%ld\n", cmd_vel_count);
+    //printf("cmdVelCallback is running!\t%ld\n", cmd_vel_count);
     
-    if ( std::abs(custom.keyData.rx) < 0.1 && std::abs(custom.keyData.lx) < 0.1 && std::abs(custom.keyData.ry) < 0.1 && std::abs(custom.keyData.ly) < 0.1 )
+    if ( std::abs(custom.keyData.rx) < 0.1 && 
+         std::abs(custom.keyData.lx) < 0.1 && 
+         std::abs(custom.keyData.ry) < 0.1 && 
+         std::abs(custom.keyData.ly) < 0.1 )
     {
+        if(timer_on && (t - t_timer).sec >= 6 || !timer_on)
+        {
+            custom.high_cmd = rosMsg2Cmd(msg);
+            printf("**** CMD VEL ****\n");
+            printf("cmd_x_vel   = %f\n", custom.high_cmd.velocity[0]);
+            printf("cmd_y_vel   = %f\n", custom.high_cmd.velocity[1]);
+            printf("cmd_yaw_vel = %f\n", custom.high_cmd.yawSpeed);
 
-    custom.high_cmd = rosMsg2Cmd(msg);
-
-    printf("cmd_x_vel = %f\n", custom.high_cmd.velocity[0]);
-    printf("cmd_y_vel = %f\n", custom.high_cmd.velocity[1]);
-    printf("cmd_yaw_vel = %f\n", custom.high_cmd.yawSpeed);
+            timer_on = false;
+        }
     }
-
+    else
+    {
+        if(!timer_on)
+            timer_on = true;
+        t_timer = ros::Time::now();
+    }
 }
 
 void gpsCallback(const sensor_msgs::NavSatFix::Ptr &msg)
 {
-    //printf("lat = %f\n", msg->latitude);
-    //printf("long = %f\n", msg->longitude);
-    //printf("alt = %f\n", msg->altitude);
     msg->header.frame_id = tf_prefix+TRUNK;
-    pub_gps.publish(msg);	
+    pub_gps.publish(msg);
 }
 
 void pubState()
@@ -178,10 +189,10 @@ void pubState()
 
 	    for (unsigned int motor_id = 0; motor_id < N_MOTORS; ++motor_id)
 	    {
-		joint_state_msg.name[motor_id]     = go1_motor_names[motor_id];
-		joint_state_msg.position[motor_id] = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].q);
-		joint_state_msg.velocity[motor_id] = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].dq); // NOTE: this order is different than google
-		joint_state_msg.effort[motor_id]   = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].tauEst);
+            joint_state_msg.name[motor_id]     = go1_motor_names[motor_id];
+            joint_state_msg.position[motor_id] = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].q);
+            joint_state_msg.velocity[motor_id] = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].dq); // NOTE: this order is different than google
+            joint_state_msg.effort[motor_id]   = static_cast<double>(custom.high_state.motorState[go1_motor_idxs[motor_id]].tauEst);
 	    }
 
 //****************** IMU ******************
@@ -224,7 +235,7 @@ void pubState()
 //****************** ODOM -> BASEFOOT ******************
 
 	    odom_T_basefoot.header.seq              ++;
-	    odom_T_basefoot.header.stamp            = ros::Time::now();
+	    odom_T_basefoot.header.stamp            = t;
 	    odom_T_basefoot.header.frame_id         = tf_prefix+ODOM;
 	    odom_T_basefoot.child_frame_id          = tf_prefix+BASEFOOT;
 	    odom_T_basefoot.transform.translation.x = odom_msg.pose.pose.position.x;
@@ -243,7 +254,7 @@ void pubState()
 	    for(unsigned int i = 0; i< 4; i++)
 	    {
 	      //printf("force[%i] = %f\n", i, custom.high_state.footForce[i]);
-              //printf("height[%i] = %f\n", i, custom.high_state.footPosition2Body[i].z);
+          //printf("height[%i] = %f\n", i, custom.high_state.footPosition2Body[i].z);
 	      contact_states[i]  = (std::abs(custom.high_state.footForce[i]) > 0.0 ? true : false );
 	      contact_heights[i] = -static_cast<double>(custom.high_state.footPosition2Body[i].z);
 	    }
@@ -253,7 +264,7 @@ void pubState()
 
 	    basefoot_T_trunk = tf2::eigenToTransform(basefoot_estimator.getBasefootPoseInBase().inverse());
 	    basefoot_T_trunk.header.seq       ++;
-	    basefoot_T_trunk.header.stamp    = ros::Time::now();
+	    basefoot_T_trunk.header.stamp    = t;
 	    basefoot_T_trunk.header.frame_id = tf_prefix+BASEFOOT;
 	    basefoot_T_trunk.child_frame_id  = tf_prefix+TRUNK;
 
@@ -274,11 +285,11 @@ void pubState()
 	    pub_imu.publish(imu_msg);
 	    
 //****************** WIRELESS REMOTE CHECK ****************
-            memcpy(&custom.keyData, &custom.high_state.wirelessRemote[0], 40);   
-            //std::cout << "lx "<< custom.keyData.lx << std::endl;
-            //std::cout << "ly "<< custom.keyData.ly << std::endl;
-            //std::cout << "rx "<< custom.keyData.rx << std::endl;
-            //std::cout << "ry "<< custom.keyData.ry << std::endl;
+        memcpy(&custom.keyData, &custom.high_state.wirelessRemote[0], 40);   
+        //std::cout << "lx "<< custom.keyData.lx << std::endl;
+        //std::cout << "ly "<< custom.keyData.ly << std::endl;
+        //std::cout << "rx "<< custom.keyData.rx << std::endl;
+        //std::cout << "ry "<< custom.keyData.ry << std::endl;
 
     }
 
@@ -297,6 +308,8 @@ int main(int argc, char **argv)
     // Check and fix tf_prefix
     wolf_controller_utils::fixTFprefix(tf_prefix);
 
+    t = t_prev = t_timer = ros::Time::now();
+
     joint_state_msg.name.resize(N_MOTORS);
     joint_state_msg.position.resize(N_MOTORS);
     joint_state_msg.velocity.resize(N_MOTORS);
@@ -310,7 +323,7 @@ int main(int argc, char **argv)
     pub_tf.reset(new tf2_ros::TransformBroadcaster);
 
     sub_cmd_vel = nh.subscribe("cmd_vel", 20,  cmdVelCallback);
-    sub_gps     = nh.subscribe("/location", 20, gpsCallback); // Note the root
+    sub_gps     = nh.subscribe("location", 20, gpsCallback);
 
     LoopFunc loop_udpSend("high_udp_send", 0.002, 3, boost::bind(&Custom::highUdpSend, &custom));
     LoopFunc loop_udpRecv("high_udp_recv", 0.002, 3, boost::bind(&Custom::highUdpRecv, &custom));
