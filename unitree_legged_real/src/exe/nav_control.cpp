@@ -167,6 +167,9 @@ void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg)
         if(!timer_on)
             timer_on = true;
         t_timer = ros::Time::now();
+        custom.high_cmd.velocity[0] = 0;
+        custom.high_cmd.velocity[1] = 0;
+        custom.high_cmd.yawSpeed = 0;
     }
 }
 
